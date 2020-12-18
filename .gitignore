@@ -1,0 +1,30 @@
+# Ignore MacOS files
+.DS_STORE
+# Ignore any Python cache
+__pycache__
+# Ignore any Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Ignore extra LaTeX build files
+*.fdb_latexmk
+*.log
+*.synctex.gz
+*.fls
+*.run.xml
+*.bcf
+*.aux
+*.bbl
+*.blg
+
+# 
+_minted_notes
+_minted*
+*~
+*.pkl
+*.pyc
+
+# Ignore temporary individual results for testing
+temp
+# Ignore distribution folders
+build
+dist
