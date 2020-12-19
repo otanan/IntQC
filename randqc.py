@@ -758,6 +758,19 @@ def get_total_gates(instructions):
 
     return sum([instruction[1] for instruction in instructions])
 
+def get_number_of_blocks(instructions):
+    """
+        Calculates the number of circuit blocks. For example, a circuit with instructions: Clx100;Tx1;Cl100 has 3 blocks. The first one being 100 Clifford gates, the second being 1 T gate and so on.
+    
+        Args:
+            instructions (str): the circuit instructions
+    
+        Returns:
+            num (int): the number of circuit blocks
+    
+    """
+    return len(parse_instructions(instructions))
+
 def _sing_values_of_bipart_state(q, bipartition=None):
     """
         Calculates the singular values of a bipartitioned state.
@@ -1487,6 +1500,9 @@ def randomqc(
     save_flags['no_save'] = no_save_flag
     save_flags['save_all'] = save_all_flag
 
+    # List containing the output state of each block of the circuit
+    qs = []
+
     #------------- Check flags -------------#
 
     # Since we're not saving nothing, we want to have a directory ready
@@ -1523,6 +1539,8 @@ def randomqc(
         # Reset the input state through the label passed or otherwise
             # copy the fixed state to reuse it as an input
         q = parse_state_string(N, q0_label) if q0 is None else q0.copy()
+        # Add the initial state to the list of output states
+        qs.append(q)
 
         if save_flags['entropy']:
             # Vector that holds the current trial's entropy data
@@ -1577,6 +1595,10 @@ def randomqc(
                 entropy_data = np.append(entropy_data, circuit_entropy_data)
             else:
                 q = eval_circuit(circuit, q, gather_entropies=False)
+
+
+            # Add the output of the block to list of states
+            qs.append(q)
 
             #------------- Printing -------------#
 
@@ -1650,7 +1672,7 @@ def randomqc(
     if not verbose_flag:
         bar.finish()
 
-    return q
+    return qs
 
 def main():
     print('In randomqc.py')

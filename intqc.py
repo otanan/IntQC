@@ -147,6 +147,18 @@ def main():
         # Set the dimensions of the screen and where it is placed
         bar_master.geometry('%dx%d+%d+%d' % (bar_window_width, bar_window_height, x, y))
 
+    def _update_options(*args):
+        """
+            Changes available options in the case where N is large.
+        
+        """
+        N = N_slider.get()
+        if N > 12:
+            haar_state_button.configure(state=tkinter.DISABLED)
+        else:
+            haar_state_button.configure(state=tkinter.NORMAL)
+
+
     def _window_init():
         """
             Tkinter window preparation.
@@ -185,6 +197,56 @@ def main():
         for i in range(ncols):
             tkinter.Grid.columnconfigure(master, i, weight=1)
 
+    # Slider passes arguments for command, ignore them
+    def _update_state_view(*args):
+        block_num = state_block_slider.get()
+        # Get the corresponding N and bipartition
+        N = N_slider.get()
+        bipartition = N // 2
+
+        image_state = qstate_imager.state_to_image(qs[block_num], bipartition=bipartition, cmap=cmap)
+        # Draw the newly selected image
+        ax2.imshow(image_state)
+        # Update the canvas
+        canvas.draw()
+
+    def _update_visual_map(visual_map_choice):
+        """
+            Function to choose what map to apply to state images.
+        
+        """
+        # Update the current visual map
+        nonlocal visual_map
+        visual_map = visual_map_choice
+
+        block_num = state_block_slider.get()
+        # Get the corresponding N and bipartition
+        N = N_slider.get()
+        bipartition = N // 2
+
+        initial_state_matrix = qstate_imager.state_to_matrix(qs[0], bipartition=bipartition)
+
+        current_state_matrix = qstate_imager.state_to_matrix(qs[block_num], bipartition=bipartition)
+
+        if visual_map == '|Psi|^2':
+            # No manipulations needed
+            pass
+        elif visual_map == '|Psi|':
+            # We want moduli not square moduli of probabilities
+            initial_state_matrix **= 0.5
+            current_state_matrix **= 0.5
+
+        # Convert the matrices to images
+        initial_state_image = qstate_imager.matrix_to_image(initial_state_matrix, cmap=cmap)
+        current_state_image = qstate_imager.matrix_to_image(current_state_matrix, cmap=cmap)
+
+        # Draw the newly selected image
+        ax.imshow(initial_state_image)
+        ax2.imshow(current_state_image)
+        # Update the canvas
+        canvas.draw()
+
+
     def _update():
         """
             Updates the contents of the interactive window based on input.
@@ -195,7 +257,7 @@ def main():
         ax.clear(); ax2.clear()
 
         # Clear counter data for entropy data when changing state
-        nonlocal counter, progress
+        nonlocal counter, progress, qs
         counter = 1
 
         ### Get the contents of input on update ###
@@ -221,32 +283,49 @@ def main():
 
         # saves the initial state
         initial_state = randqc.parse_state_string(N, q0_label)
-        image_initial_state = qstate_imager.state_to_image(initial_state, bipartition=bipartition, cmap=cmap)
+        initial_state_matrix = qstate_imager.state_to_matrix(initial_state, bipartition=bipartition)
 
         # First image generated
         if not _INITIALIZED:
             _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
         # Runs the initial state through the circuit
-        output_state = randqc.randomqc(N=N, instructions=instructions, q0_label=q0_label, q0=initial_state, entropy_flag=True, save_path=temp_path, renyi_parameter=renyi_parameter)
+        qs = randqc.randomqc(N=N, instructions=instructions, q0_label=q0_label, q0=initial_state, entropy_flag=True, save_path=temp_path, renyi_parameter=renyi_parameter)
+        output_state = qs[-1]
+        current_state_matrix = qstate_imager.state_to_matrix(qs[-1], bipartition=bipartition)
 
         # Completed default circuit
         if not _INITIALIZED:
             _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
-        image_output_state = qstate_imager.state_to_image(output_state, bipartition=bipartition, cmap=cmap)
+        if visual_map == '|Psi|^2':
+            # No manipulations needed
+            pass
+        elif visual_map == '|Psi|':
+            # We want moduli not square moduli of probabilities
+            initial_state_matrix **= 0.5
+            current_state_matrix **= 0.5
+
+        # Convert the matrices to images
+        initial_state_image = qstate_imager.matrix_to_image(initial_state_matrix, cmap=cmap)
+        current_state_image = qstate_imager.matrix_to_image(current_state_matrix, cmap=cmap)
 
         # Output image generated
         if not _INITIALIZED:
             _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
+        # Update the slider
+        num_blocks = randqc.get_number_of_blocks(instructions)
+        state_block_slider.configure(to=num_blocks)
+        state_block_slider.set(num_blocks)
 
         # Set their titles
         ax.set_title(f'Initial state: {q0_label}')
         ax2.set_title(f'Output of circuit: {instructions}')
 
         # Plot the images
-        ax.imshow(image_initial_state)
-        ax2.imshow(image_output_state)
+        ax.imshow(initial_state_image)
+        ax2.imshow(current_state_image)
 
         # Images drawn
         if not _INITIALIZED:
@@ -345,12 +424,12 @@ def main():
             return
 
         # We've plotted all of the curves and their mean
-        if counter > num_entropy_curves:
+        if counter >= num_entropy_curves:
             return
         
         counter += 1
 
-        randqc.randomqc(N=N, instructions=instructions, q0_label=q0_label, q0=initial_state, entropy_flag=True, save_path=temp_path, renyi_parameter=renyi_parameter)
+        randqc.randomqc(N=N, instructions=instructions, q0_label=q0_label, q0=initial_state, entropy_flag=True, save_path=temp_path, renyi_parameter=renyi_parameter)[-1]
 
         # Reload the new entropy data
         entropy_data = np.loadtxt(entropy_file_path)
@@ -402,8 +481,10 @@ def main():
     num_entropy_curves = 10
     ncols = 3
 
+    default_instructions = 'Clx50;Tx1;Clx50'
+
     # Increase the scope of the states
-    initial_state = output_state = None
+    initial_state = output_state = qs = None
     _window_init()
 
     # Window created
@@ -423,7 +504,7 @@ def main():
 
     ### Number of qubits input ###
     ttk.Label(master, text='Number of qubits:').grid(row=row, column=0)
-    N_slider = tkinter.Scale(master, from_=2, to=12, orient=tkinter.HORIZONTAL)
+    N_slider = tkinter.Scale(master, from_=2, to=16, orient=tkinter.HORIZONTAL, command=_update_options)
     N_slider.grid(row=row, column=1)
     # Set the default value
     N_slider.set(8)
@@ -437,6 +518,8 @@ def main():
     cmaps = {
         'Viridis':cm.viridis,
         'Gray': cm.gray,
+        'Afmhot':cm.afmhot,
+        'Jet':cm.jet,
         'Plasma':cm.plasma,
         'Inferno':cm.inferno,
         'Magma':cm.magma,
@@ -461,6 +544,30 @@ def main():
     # We're entering a new section of inputs
     row += 1
 
+    ### State post block selector ###
+    # state_post_circuit_var = tkinter.StringVar(master)
+    ttk.Label(master, text='State after circuit block:').grid(row=row, column=0)
+    num_blocks = randqc.get_number_of_blocks(default_instructions)
+    # The slider will be instantiated without a command until we've loaded
+        # the first block to avoid needing to configure our initialization code
+    state_block_slider = tkinter.Scale(master, from_=1, to=num_blocks, orient=tkinter.HORIZONTAL)
+    state_block_slider.grid(row=row, column=1)
+    # Set the default value to show the output of the complete circuit
+    state_block_slider.set(num_blocks)    
+
+    ### Drop down to choose how to view state images ###
+    visuals = ['|Psi|^2', '|Psi|']
+    default_visual = visuals[0]
+    visual_map = default_visual
+
+    visuals_var = tkinter.StringVar(master)
+    visuals_var.set(default_visual)
+
+    visuals_menu = tkinter.OptionMenu(master, visuals_var, *visuals, command=_update_visual_map)
+    visuals_menu.grid(row=row, column=2)
+
+    row += 1
+
     # ### Initial state input ###
     q0_button_var = tkinter.StringVar()
     zero_state_button = tkinter.Radiobutton(master, text='Zero state', variable=q0_button_var, value='zero')
@@ -474,7 +581,8 @@ def main():
     # Adds a radio button for random phase states
     # tkinter.Radiobutton(master, text='Phase state', variable=q0_button_var, value='phase').grid(row=row, column=2)
 
-    tkinter.Radiobutton(master, text='Random Haar state', variable=q0_button_var, value='rand').grid(row=row, column=2)
+    haar_state_button = tkinter.Radiobutton(master, text='Random Haar state', variable=q0_button_var, value='rand')
+    haar_state_button.grid(row=row, column=2)
 
     # Input state buttons made
     _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
@@ -485,7 +593,7 @@ def main():
     ttk.Label(master, text='Circuit instructions:').grid(row=row, column=0)
     instructions_entry = ttk.Entry(master)
     # # Sets the default circuit instructions
-    instructions_entry.insert(10, 'Clx50;Tx1;Clx50')    
+    instructions_entry.insert(10, default_instructions)    
     instructions_entry.grid(row=row, column=1)
 
     # Circuit instructions input made
@@ -529,6 +637,9 @@ def main():
     _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
     _update()
+
+    # Listen for slider movements
+    state_block_slider.configure(command=_update_state_view)
 
     # We've initialized the GUI for the first time and are ready to start
         # the mainloop
