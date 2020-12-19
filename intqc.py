@@ -71,6 +71,8 @@ os.environ["VECLIB_MAXIMUM_THREADS"] = _THREAD_LIMIT
 # export NUMEXPR_NUM_THREADS=$_THREAD_LIMIT
 os.environ["NUMEXPR_NUM_THREADS"] = _THREAD_LIMIT
 
+_progress = 0
+
 def indicate_gates(ax, instructions, gate='T'):
     """
         Helper function that marks on a plot where gates are being applied,
@@ -97,14 +99,74 @@ def indicate_gates(ax, instructions, gate='T'):
 
         gate_placement += gate_count
 
+import time
+def _update_progress_bar(bar, master, update_amount, BAR_LEN):
+    """
+        Function that handles updating the progress bar.
+    
+    """
+    global _progress
+    _progress += update_amount
+    # Converts the progress into a percentage
+    status = _progress / BAR_LEN * 100
+
+    bar['value'] = status
+
+    # time.sleep(1) # Uncomment to see the bar more clearly
+    master.update()
+
 def main():
 
     def _quit():
-        master.quit()     # stops mainloop
-        master.destroy()  # this is necessary on Windows to prevent
-                        # Fatal Python Error: PyEval_RestoreThread: NULL tstate
+        """
+            Provides functionality to quit button.
+        
+        """
+        # Stops mainloop
+        master.quit()
+        # This is necessary on Windows to prevent fatal Python Error: 
+            # PyEval_RestoreThread: NULL tstate
+        master.destroy()
+        # Quits out of Platypus
+        print("QUITAPP\n")
 
-    def _init():
+    def _progress_bar_init():
+        bar_master.wm_title('Loading...')
+
+        bar_master.style = ttk.Style()
+        bar_master.style.theme_use('classic')
+
+        bar_window_width = 200
+        bar_window_height = 40
+
+        width_screen = bar_master.winfo_screenwidth() # width of the screen
+        height_screen = bar_master.winfo_screenheight() # height of the screen
+        # Calculate (x, y) coordinates for the Tk bar_master window
+        x = (width_screen/2) - (bar_window_width/2)
+        y = (height_screen/2) - (bar_window_height/2)
+        # Set the dimensions of the screen and where it is placed
+        bar_master.geometry('%dx%d+%d+%d' % (bar_window_width, bar_window_height, x, y))
+
+    def _window_init():
+        """
+            Tkinter window preparation.
+        
+        """
+        master.wm_title('Interactive Quantum Circuits')
+        # Change the styling to match MacOS
+        # print(ttk.Style().theme_names())
+        # master.style = ttk.Style()
+        # master.style.theme_use('aqua')
+
+        width_screen = master.winfo_screenwidth() # width of the screen
+        height_screen = master.winfo_screenheight() # height of the screen
+        # Calculate (x, y) coordinates for the Tk master window
+        x = (width_screen/2) - (width/2)
+        y = (height_screen/2) - (height/2)
+        # Set the dimensions of the screen and where it is placed
+        master.geometry('%dx%d+%d+%d' % (width, height, x, y))
+
+    def _init_axes():
         """
             Handles initialization of plots and axes. Note this function is
             only called once. Any behavior that is clear with axes.clear needs 
@@ -133,7 +195,7 @@ def main():
         ax.clear(); ax2.clear()
 
         # Clear counter data for entropy data when changing state
-        nonlocal counter
+        nonlocal counter, progress
         counter = 1
 
         ### Get the contents of input on update ###
@@ -146,6 +208,10 @@ def main():
         instructions = instructions_entry.get()
         renyi_parameter = float(renyi_entry.get())
 
+        # Input read
+        if not _INITIALIZED:
+            _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
         # Gets the location of the entropy data
         entropy_file_path = randqc.get_entropy_file_path(N, q0_label, instructions, N//2, renyi_parameter=renyi_parameter, root=temp_path)
 
@@ -157,9 +223,22 @@ def main():
         initial_state = randqc.parse_state_string(N, q0_label)
         image_initial_state = qstate_imager.state_to_image(initial_state, bipartition=bipartition, cmap=cmap)
 
+        # First image generated
+        if not _INITIALIZED:
+            _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
         # Runs the initial state through the circuit
         output_state = randqc.randomqc(N=N, instructions=instructions, q0_label=q0_label, q0=initial_state, entropy_flag=True, save_path=temp_path, renyi_parameter=renyi_parameter)
+
+        # Completed default circuit
+        if not _INITIALIZED:
+            _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
         image_output_state = qstate_imager.state_to_image(output_state, bipartition=bipartition, cmap=cmap)
+
+        # Output image generated
+        if not _INITIALIZED:
+            _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
         # Set their titles
         ax.set_title(f'Initial state: {q0_label}')
@@ -169,12 +248,24 @@ def main():
         ax.imshow(image_initial_state)
         ax2.imshow(image_output_state)
 
+        # Images drawn
+        if not _INITIALIZED:
+            _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
         fig.suptitle(f'Number of qubits: {N}')
         
         canvas.draw()
 
+        # Canvas updated
+        if not _INITIALIZED:
+            _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
         # Handles clearing and plotting of first entropy curve
         _plot_entropy(instructions, entropy_file_path)
+
+        # Entropy plotted
+        if not _INITIALIZED:
+            _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
         # Plots subsequent curves as data is continually gathered
         master.after(after_timer, lambda: _update_entropy(N, q0_label, instructions, initial_state, renyi_parameter, entropy_file_path))
@@ -184,6 +275,7 @@ def main():
             Loads the entropy data and plots it
         
         """
+        nonlocal progress
 
         # Clears any previous entropy plot
         ax3.clear()
@@ -192,6 +284,10 @@ def main():
         num_gates = randqc.get_total_gates(instructions) + 1
 
         entropy_data = np.loadtxt(entropy_file_path)
+
+        # Entropy data loaded
+        if not _INITIALIZED:
+            _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
         ax3.plot(np.arange(num_gates), entropy_data, color='red')
         # Mark the location of the T gates
@@ -276,7 +372,25 @@ def main():
         # Redraw the canvas
         canvas.draw()
 
-    #------------- Tkinter parameters, editable -------------#
+    #------------- Parameters -------------#
+
+    # Initialized app flag
+    _INITIALIZED = False
+
+    master = tkinter.Tk()
+    # Hide the master window until it's ready
+    master.withdraw()
+
+    ### Prepare progress bar ###
+    # Variable for tracking progress
+    progress = 0 
+    PROGRESS_BAR_LEN = 18
+    bar_master = tkinter.Toplevel()
+    progress_bar = ttk.Progressbar(bar_master, orient=tkinter.HORIZONTAL, length=100, mode='determinate')
+
+    progress_bar.pack(fill='both', expand=True)
+    _progress_bar_init()
+    _update_progress_bar(progress_bar, bar_master, 0, PROGRESS_BAR_LEN)
 
     # Window size
     width = 1200; height = 700
@@ -290,29 +404,17 @@ def main():
 
     # Increase the scope of the states
     initial_state = output_state = None
+    _window_init()
 
-    ### Tkinter window preparation ###
-
-    # Initializes the GUI via Tkinter
-    master = tkinter.Tk()
-    master.wm_title('Interactive Quantum Circuits')
-    # Change the styling to match MacOS
-    # print(ttk.Style().theme_names())
-    master.style = ttk.Style()
-    master.style.theme_use('aqua')
-
-    width_screen = master.winfo_screenwidth() # width of the screen
-    height_screen = master.winfo_screenheight() # height of the screen
-    # Calculate (x, y) coordinates for the Tk master window
-    x = (width_screen/2) - (width/2)
-    y = (height_screen/2) - (height/2)
-    # Set the dimensions of the screen and where it is placed
-    master.geometry('%dx%d+%d+%d' % (width, height, x, y))
+    # Window created
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
     fig, (ax, ax2, ax3) = plt.subplots(ncols=ncols)
     # A tk.DrawingArea
     canvas = FigureCanvasTkAgg(fig, master=master)
     counter = 1
+
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
     #------------- Generate input fields -------------#
 
@@ -325,6 +427,9 @@ def main():
     N_slider.grid(row=row, column=1)
     # Set the default value
     N_slider.set(8)
+
+    # N slider made
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
     ### Colormap choice ###
     # For more colormaps please look at:
@@ -350,6 +455,9 @@ def main():
     cmap_menu = tkinter.OptionMenu(master, opt_var, *cmaps.keys(), command=_update_cmap)
     cmap_menu.grid(row=row, column=2)
 
+    # Cmap menu made and set
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
     # We're entering a new section of inputs
     row += 1
 
@@ -368,6 +476,9 @@ def main():
 
     tkinter.Radiobutton(master, text='Random Haar state', variable=q0_button_var, value='rand').grid(row=row, column=2)
 
+    # Input state buttons made
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
     row += 1
 
     ### Circuit instructions input ###
@@ -376,6 +487,9 @@ def main():
     # # Sets the default circuit instructions
     instructions_entry.insert(10, 'Clx50;Tx1;Clx50')    
     instructions_entry.grid(row=row, column=1)
+
+    # Circuit instructions input made
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
     row += 1
 
@@ -386,6 +500,9 @@ def main():
     renyi_entry.insert(10, '1')    
     renyi_entry.grid(row=row, column=1)
 
+    # Entropy parameter input made
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
     row += 1
 
     ### Number of entropy curves input ###
@@ -394,16 +511,34 @@ def main():
     entropy_curves_slider.set(num_entropy_curves)
     entropy_curves_slider.grid(row=row, column=1)
 
+    # Entropy curves slider made
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
     row += 1
 
     # Quit button and run button for running the simulation
     ttk.Button(master=master, text='Run', command=_update).grid(row=row, column=1)
     ttk.Button(master=master, text="Quit", command=_quit).grid(row=row, column=2)
 
-    _init()
+    # Buttons made
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
+
+    _init_axes()
+
+    # Axes initialized
+    _update_progress_bar(progress_bar, bar_master, 1, PROGRESS_BAR_LEN)
 
     _update()
 
+    # We've initialized the GUI for the first time and are ready to start
+        # the mainloop
+    _INITIALIZED = True
+    bar_master.destroy()
+
+    # Reveal the prepared window
+    master.style = ttk.Style()
+    master.style.theme_use('aqua')
+    master.deiconify()
     master.mainloop()
 
 if __name__ == '__main__':
