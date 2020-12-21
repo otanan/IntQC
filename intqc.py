@@ -31,6 +31,8 @@ from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 
 import time
+# For generating .gif
+from PIL import Image
 
 import randqc, qstate_imager
 
@@ -227,7 +229,7 @@ class IntQC:
         self.pw.update()
 
         # Listen for slider input
-        self.state_block_slider.configure(command=self._updated_state_view)
+        self.state_block_slider.configure(command=self._updated_state_block_slider)
 
         # We've initialized the GUI for the first time and are ready to start
             # the mainloop
@@ -281,14 +283,13 @@ class IntQC:
         # State block slider generated
         self.pw.update()
 
-        ### Drop down to choose how to view state images ###
-        image_maps_var = tk.StringVar(self.master)
-        image_maps_var.set(self.image_map)
-        image_maps_menu = tk.OptionMenu(self.master, image_maps_var, *self.image_maps, command=self._updated_image_map)
-        image_maps_menu.grid(row=row, column=2)
+        ### Number input for easy selection of state post block ###
+        self.state_block_entry = tk.Entry(self.master, width=3)
+        # Add listener to the entry to move slider and update the image
+        self.state_block_entry.bind('<KeyRelease>', self._updated_state_block)
+        self.state_block_entry.insert(0, str(num_blocks))
+        self.state_block_entry.grid(row=row, column=2)
 
-        # Image map menu generated
-        self.pw.update()
 
         row += 1
 
@@ -313,19 +314,28 @@ class IntQC:
         ttk.Label(self.master, text='Circuit instructions:').grid(row=row, column=0)
         self.instructions_entry = ttk.Entry(self.master)
         # Sets the default circuit instructions
-        self.instructions_entry.insert(10, self.instructions)
+        self.instructions_entry.insert(0, self.instructions)
         self.instructions_entry.grid(row=row, column=1)
 
         # Circuit instructions input made
+        self.pw.update()
+
+       ### Drop down to choose how to view state images ###
+        image_maps_var = tk.StringVar(self.master)
+        image_maps_var.set(self.image_map)
+        image_maps_menu = tk.OptionMenu(self.master, image_maps_var, *self.image_maps, command=self._updated_image_map)
+        image_maps_menu.grid(row=row, column=2)
+
+        # Image map menu generated
         self.pw.update()
 
         row += 1
 
         ### Renyi parameter input ###
         ttk.Label(self.master, text='Renyi Entropy:').grid(row=row, column=0)
-        self.renyi_entry = ttk.Entry(self.master)
+        self.renyi_entry = ttk.Entry(self.master, width=3)
         # Sets the default Renyi parameter
-        self.renyi_entry.insert(10, str(self.renyi_parameter))
+        self.renyi_entry.insert(0, str(self.renyi_parameter))
         self.renyi_entry.grid(row=row, column=1)
 
         # Entropy parameter input made
@@ -345,8 +355,10 @@ class IntQC:
         row += 1
 
         # Quit and Run buttons for controlling the simulation
+        ttk.Button(master=self.master, text='Quit', command=self._quit).grid(row=row, column=0)
         ttk.Button(master=self.master, text='Run', command=self._update).grid(row=row, column=1)
-        ttk.Button(master=self.master, text='Quit', command=self._quit).grid(row=row, column=2)
+        # Export gif button to create an animation of state evolution
+        ttk.Button(master=self.master, text='Export GIF', command=self._export_gif).grid(row=row, column=2)
 
     def _init_axes(self):
         """
@@ -404,6 +416,9 @@ class IntQC:
         num_blocks = randqc.get_number_of_blocks(self.instructions)
         self.state_block_slider.configure(to=num_blocks)
         self.state_block_slider.set(num_blocks)
+        # Clear the text of the entry on update
+        self.state_block_entry.delete(0, tk.END)
+        self.state_block_entry.insert(0, num_blocks)
 
         self.ax.set_title(f'Initial state: {self.initial_state_label}')
         self.ax2.set_title(f'Output of circuit: {self.instructions}')
@@ -545,6 +560,34 @@ class IntQC:
 
         return image
 
+    def _export_gif(self):
+        folder = 'gifs'
+        # Make the folder if it doesn't exist
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
+        fname = os.path.join(folder, f'N({self.N})-q0({self.initial_state_label})-inst[{self.instructions}]' + randqc.get_serial())
+
+        # Filter out blocks of circuits with only T gates to avoid the effect
+            # of a longer pause on the image animation since the image will
+            # generally be unchanged after only T gates
+        filtered_instructions_indices = [0] + [
+            i + 1 for i, block in enumerate(
+                randqc.parse_instructions(self.instructions)
+            ) if block[0] != 'T'
+            # ) if block[0] != 'T' or block[1] > self.N
+        ]
+
+        first_image, *remaining = [
+            # Change the resampling method to avoid blurring interpolation
+                # and resize the image to make it viewable
+            self.state_to_image(self.states[filtered_instructions_indices[i]]).resize((512, 512), resample=Image.NEAREST)
+            for i in range(len(filtered_instructions_indices))
+        ]
+
+        first_image.save(fp=fname + '.gif', format='GIF', append_images=remaining, save_all=True, duration=1000, loop=0, dpi=80)
+        print('GIF saved successfully.')
+
     #------------- Listener functions for updated GUI elements -------------#
 
     def _updated_N(self, *args):
@@ -575,9 +618,27 @@ class IntQC:
         self._update_state_1(self.state_to_image(self.state_1))
         self._update_state_2(self.state_to_image(self.state_2))
 
-    def _updated_state_view(self, *args):
+    def _updated_state_block_slider(self, *args):
         block_num = self.state_block_slider.get()
+        # Update the text entry to match the slider
+        self.state_block_entry.delete(0, tk.END)
+        self.state_block_entry.insert(0, block_num)
+        # Update the image
         self._update_state_2(self.state_to_image(self.states[block_num]))
+
+    def _updated_state_block(self, *args):
+        # Try to convert the input into an integer, if it's not one
+            # then ignore it
+        try:
+            num = int(self.state_block_entry.get())
+        except:
+            return
+
+        # Update the slider to match
+        # The listener on the block is sufficient to do the rest of the
+            # work.
+        self.state_block_slider.set(num)
+
 
 
 def main():
