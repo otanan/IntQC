@@ -113,7 +113,7 @@ def indicate_gates(ax, instructions, gate='T'):
 class ProgressWindow:
     # Object which will handle creating a Tkinter Progress window
 
-    def __init__(self, MAX_VALUE, width=200, height=40):
+    def __init__(self, MAX_VALUE, width=200, height=40, title='Loading...'):
         # Must know maximum to calculate percentages
         self._MAX_VALUE = MAX_VALUE
         # Initialize value property
@@ -121,6 +121,7 @@ class ProgressWindow:
         self.master = tk.Toplevel()
         self.bar = ttk.Progressbar(self.master, orient=tk.HORIZONTAL, length=100, mode='determinate')
         self.width = width; self.height = height
+        self.title = title
 
         self._style()
         center_window(self.master, self.width, self.height)
@@ -131,7 +132,7 @@ class ProgressWindow:
         
         """
         self.bar.pack(fill='both', expand=True)
-        self.master.wm_title('Loading...')
+        self.master.wm_title(self.title)
         self.master.style = ttk.Style()
         self.master.style.theme_use('classic')
 
@@ -562,6 +563,8 @@ class IntQC:
 
     def _export_gif(self):
         folder = 'gifs'
+        duration = 1000
+
         # Make the folder if it doesn't exist
         if not os.path.exists(folder):
             os.makedirs(folder)
@@ -578,14 +581,27 @@ class IntQC:
             # ) if block[0] != 'T' or block[1] > self.N
         ]
 
-        first_image, *remaining = [
+        pw = None
+        # Let's make a loading screen, this might take a while
+        if len(filtered_instructions_indices) > 100 and self.N >= 8:
+            # Add 20% to estimate how long the gif maker will take
+            pw = ProgressWindow(1.2 * len(filtered_instructions_indices), title='Exporting...')
+            # Let's speed it up otherwise the gif will be long
+            duration = 200
+
+        remaining = []
+        for i in range(len(filtered_instructions_indices) - 1):
             # Change the resampling method to avoid blurring interpolation
                 # and resize the image to make it viewable
-            self.state_to_image(self.states[filtered_instructions_indices[i]]).resize((512, 512), resample=Image.NEAREST)
-            for i in range(len(filtered_instructions_indices))
-        ]
+            remaining.append(self.state_to_image(self.states[filtered_instructions_indices[1:][i]]).resize((512, 512), resample=Image.NEAREST))
 
-        first_image.save(fp=fname + '.gif', format='GIF', append_images=remaining, save_all=True, duration=1000, loop=0, dpi=80)
+            first_image = self.state_to_image(self.states[0]).resize((512, 512), resample=Image.NEAREST)
+
+            if pw is not None: pw.update()
+
+        first_image.save(fp=fname + '.gif', format='GIF', append_images=remaining, save_all=True, duration=duration, loop=0, dpi=80)
+
+        if pw is not None: pw.finish()
         print('GIF saved successfully.')
 
     #------------- Listener functions for updated GUI elements -------------#
