@@ -15,7 +15,8 @@
 </div>
 
 <!-- Project Screenshot -->
-[![Screenshot][screenshot]](https://jdelgado.net/images/quantum-information-theory/intqc.webp)
+![Screenshot](/res/intqc.jpg?raw=true "IntQC")
+
 
 ### Status: _discontinued_.
 
@@ -31,4 +32,3 @@ Created by [@otanan].
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[screenshot]: res/intqc.jpg
