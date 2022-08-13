@@ -3,32 +3,32 @@
 <!-- Description:   GitHub README -->
 
 <!-- Header -->
-<div align="center">
-    <h3 align="center">
-        IntQC
-    </h3>
+<br />
 
-    <p align="center">Interactive Quantum Circuits. A visualizer for quantum states when operated on by random quantum circuits.</p>
+<h3 align="center">IntQC</h3>
 
-    <!-- Links -->
-    <a href="https://otanan.notion.site/IntQC-380ababd4ce54915995edb241d0064bb">Notion Roadmap</a>
+  <p align="center">
+    Interactive Quantum Circuits. A visualizer for quantum states when operated on by random quantum circuits.
+    <br />
+    <a href="https://otanan.notion.site/IntQC-380ababd4ce54915995edb241d0064bb"><strong>Notion Roadmap »</strong></a>
+  </p>
 </div>
 
 <!-- Project Screenshot -->
 [![Screenshot][screenshot]](https://jdelgado.net/images/quantum-information-theory/intqc.webp)
+
+### Status: _discontinued_.
 
 ## Table of contents
 * [Getting Started](#getting-started)
 * [Usage](#Usage)
 * [Examples](#code-examples)
 
-## Status: _discontinued_.
-
 ## Contact
 Created by [@otanan].
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-<!-- Markdown links dictionary -->
+<!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[screenshot]: https://jdelgado.net/images/quantum-information-theory/intqc.webp
+[screenshot]: res/intqc.webp
