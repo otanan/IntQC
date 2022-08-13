@@ -10,7 +10,7 @@
     <br />
     Status: <em>discontinued</em>
     ·
-    <a href="https://otanan.notion.site/IntQC-380ababd4ce54915995edb241d0064bb" target="_blank"><strong>Notion Roadmap »</strong></a>
+    <a target="_blank" href="https://otanan.notion.site/IntQC-380ababd4ce54915995edb241d0064bb"><strong>Notion Roadmap »</strong></a>
   </p>
 </div>
 
