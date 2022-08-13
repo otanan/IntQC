@@ -31,4 +31,4 @@ Created by [@otanan].
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[screenshot]: res/intqc.webp
+[screenshot]: res/intqc.jpg
