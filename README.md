@@ -34,6 +34,8 @@
 
 Run the ```intqc.py``` script.
 
+Note that this project makes use of an outdated version of the [RandQC](https://github.com/otanan/RandQC) repository.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Contact
